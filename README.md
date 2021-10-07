@@ -1,6 +1,8 @@
 # MuSe2021 || <a href="https://www.muse-challenge.org/">HOMEPAGE</a>
 
 ## Baseline model: LSTM Regressor / Classifier 
+## Baseline model: Multi-modal Stress Recognition Using Temporal Convolution and Recurrent Network with Positional Embedding
+## Rank:3
 
 Sub-challenges: **MuSe-Wilder** and **MuSe-Stress** which focus on continuous emotion (valence and arousal) prediction; **MuSe-Sent**, in which participants recognise five classes each for valence and arousal; and **MuSe-Physio**, in which the novel aspect of physiological-emotion is to be predicted. 
 

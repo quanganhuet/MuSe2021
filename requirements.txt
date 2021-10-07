@@ -1,6 +1,78 @@
 numpy
 pandas
-torch == 1.8.0+cu111
+torch==1.8.0+cu111
+torchvision==0.9.0+cu111
+torchaudio==0.8.0
 scikit-learn
 
 --find-links https://download.pytorch.org/whl/torch_stable.html
+
+Arousal
+Egemaps:
+d_in: 89
+d_rnn_in: 128
+tcn_channes: 128
+d_rnn: 128
+num_last_regression: 64
+CCC: 0.3977
+
+FAU:  
+d_in: 18
+d_rnn_in:17
+tcn_channes: 17
+d_rnn: 16
+num_last_regression: 8
+CCC: 0.4058
+
+Bert:
+d_in: 769
+d_rnn_in: 512
+tcn_channes: 512
+d_rnn: 256
+num_last_regression: 64
+CCC: 0.4804
+
+DeepSpectrum:
+d_in: 4097
+d_rnn_in: 512
+tcn_channes: 512
+d_rnn: 256
+num_last_regression: 64
+CCC: 0.4012
+
+Valence:
+
+vggface:
+d_in: 513
+d_rnn_in: 512
+tcn_channes: 512
+d_rnn: 256
+num_last_regression: 64
+CCC: 0.599
+
+
+
+egemaps
+d_in: 89
+d_rnn_in: 88
+tcn_channes: 88
+d_rnn: 64
+num_last_regression: 32
+CCC: 0.6599
+
+Bert:
+d_in: 769
+d_rnn_in: 512
+tcn_channes: 512
+d_rnn: 256
+num_last_regression: 64
+CCC: 0.4804
+
+Bert:
+d_in: 769
+d_rnn_in: 512
+tcn_channes: 512
+d_rnn: 256
+num_last_regression: 64
+CCC: 0.5926
+

@@ -24,7 +24,7 @@ PATH_TO_METADATA = {
     'physio': os.path.join(BASE_PATH, 'c4_muse_physio/metadata')
 }
 
-PARTITION_FILES = {task: os.path.join(path_to_meta, 'partition.csv') for task,path_to_meta in PATH_TO_METADATA.items()}
+PARTITION_FILES = {task: os.path.join(path_to_meta, 'partition.csv').replace('\\','/') for task,path_to_meta in PATH_TO_METADATA.items()}
 
 OUTPUT_PATH = '/Muse2021/results/'
 LOG_FOLDER = os.path.join(OUTPUT_PATH, 'log_muse')

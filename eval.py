@@ -8,15 +8,18 @@ from loss import get_segment_wise_logits, get_segment_wise_labels
 
 
 def calc_ccc(preds, labels):
+    print(len)
     preds = np.row_stack(preds)[:, 0]
     labels = np.row_stack(labels)[:, 0]
 
     preds_mean, labels_mean = np.mean(preds), np.mean(labels)
-    cov_mat = np.cov(preds, labels)
-    covariance = cov_mat[0, 1]
-    preds_var, labels_var = cov_mat[0, 0], cov_mat[1, 1]
 
-    ccc = 2.0 * covariance / (preds_var + labels_var + (preds_mean - labels_mean) ** 2)
+    preds_var  = np.sum((preds-preds_mean)**2)/preds.shape[0]
+    labels_var = np.sum((labels-labels_mean)**2)/labels.shape[0]
+    # print("labels_mean: {}".format(str(labels_mean)))
+    # print("preds_mean: {}".format(str(preds_mean)))
+    cov = np.sum((preds-preds_mean)*(labels-labels_mean))/preds.shape[0]
+    ccc = 2.0 * cov / (preds_var + labels_var + (preds_mean - labels_mean) ** 2)
     return ccc
 
 
@@ -115,10 +118,11 @@ def evaluate(task, model, data_loader, criterion, use_gpu=False, predict=False, 
     if task == 'sent':
         full_logits = []
         full_metas_stepwise = []
-
+    
     model.eval()
     with torch.no_grad():
         for batch, batch_data in enumerate(data_loader, 1):
+
             features, feature_lens, labels, metas = batch_data
             batch_size = features.size(0)
 
@@ -128,15 +132,9 @@ def evaluate(task, model, data_loader, criterion, use_gpu=False, predict=False, 
                 feature_lens = feature_lens.cuda()
                 labels = labels.cuda()
 
+
             preds = model(features, feature_lens)
-
-            if task == 'sent':
-                logits_stepwise = preds
-                metas_stepwise = metas
-                logits = get_segment_wise_logits(preds, feature_lens)
-                preds = torch.argmax(logits, dim=1)
-                metas = get_segment_wise_labels(metas)
-
+            # preds = model(vggface,egemaps, feature_lens)
             if predict:
                 full_metas.append(metas.detach().squeeze(0).numpy())
                 if task == 'sent':
@@ -154,7 +152,6 @@ def evaluate(task, model, data_loader, criterion, use_gpu=False, predict=False, 
 
                 full_labels.append(labels.cpu().detach().squeeze(0).numpy())
             full_preds.append(preds.cpu().detach().squeeze(0).numpy())
-
         if predict:
             if task == 'sent':
                 # segment-wise predictions

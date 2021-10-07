@@ -7,7 +7,6 @@ import pickle
 def get_data_partition(partition_file):
     vid2partition, partition2vid = {}, {}
     df = pd.read_csv(partition_file)
-
     for row in df.values:
         vid, partition = str(row[0]), row[-1]
         vid2partition[vid] = partition
@@ -20,23 +19,10 @@ def get_data_partition(partition_file):
 
 
 def segment_sample(sample, win_len, hop_len, segment_type='normal'):
+    #win_len =300, hop_len =50
     segmented_sample = []
     assert hop_len <= win_len and win_len >= 10
-
-    segment_ids = sorted(set(sample['segment_id'].values))
-    if segment_type in ['by_segs', 'by_segs_only']:
-        for id in segment_ids:
-            segment = sample[sample['segment_id'] == id]
-            if segment_type == 'by_segs_only':
-                segmented_sample.append(segment)
-            else:
-                for s_idx in range(0, len(segment), hop_len):
-                    e_idx = min(s_idx + win_len, len(segment))
-                    sub_segment = segment.iloc[s_idx:e_idx]
-                    segmented_sample.append(sub_segment)
-                    if e_idx == len(segment):
-                        break
-    elif segment_type == 'normal':
+    if segment_type == 'normal':
         for s_idx in range(0, len(sample), hop_len):
             e_idx = min(s_idx + win_len, len(sample))
             segment = sample.iloc[s_idx:e_idx]
@@ -67,115 +53,130 @@ def normalize_data(data, idx_list, column_name='feature'):
 
 
 def load_data(task, paths, feature_set, emo_dim, normalize=True, norm_opts=None, win_len=200, hop_len=100, save=False,
-              apply_segmentation=True):
+              apply_segmentation=True, encoding_position= True):
+    print("Apply_Segmentation="+str(apply_segmentation))
+    # task==stress
+    #paths={
+    # 'log': '/Muse2021/results/log_muse/stress', 
+    # 'data': '/Muse2021/results/data_muse/stress', 
+    # 'model': '/Muse2021/results/model_muse/stress/2021-05-11-13-17_[vggface]_[arousal]_[64_4_True]_[0.002_1024]', 
+    # 'save': 'preds/stress/2021-05-11-13-17_[vggface]_[arousal]_[64_4_True]_[0.002_1024]',
+    #  'features': '/Muse2021/data/c3_muse_stress/feature_segments',
+    #  'labels': '/Muse2021/data/c3_muse_stress/label_segments',
+    #  'partition': '/Muse2021/data/c3_muse_stress/metadata/partition.csv'
+    # }
+    #predict=False, regularization=0.0, rnn_bi=True, rnn_n_layers=4, save=True,
+    #  save_path='preds', seed=101, task='stress', use_gpu=True, win_len=300
+
     feature_path = paths['features']
     label_path = paths['labels']
 
     data_file_name = f'data_{task}_{"_".join(feature_set)}_{emo_dim}_{"norm_" if normalize else ""}{win_len}_' \
         f'{hop_len}{"_seg" if apply_segmentation else ""}.pkl'
-    data_file = os.path.join(paths['data'], data_file_name)
-
-    if os.path.exists(data_file):  # check if file of preprocessed data exists
-        print(f'Find cached data "{os.path.basename(data_file)}".')
-        data = pickle.load(open(data_file, 'rb'))
-        return data
+    data_file = os.path.join(paths['data'], data_file_name).replace('\\', '/')
+    # if os.path.exists(data_file):  # check if file of preprocessed data exists
+    #     print(f'Find cached data "{os.path.basename(data_file)}".')
+    #     data = pickle.load(open(data_file, 'rb'))
+    #     return data
 
     print('Constructing data from scratch ...')
-    data = {'train': {'feature': [], 'label': [], 'meta': []},
-            'devel': {'feature': [], 'label': [], 'meta': []},
-            'test': {'feature': [], 'label': [], 'meta': []}}
+    data = {'train': {'feature': [],"vggface":[] , "egemaps": [], "bert":[], "timestamp":[],'label': [], 'meta': []},
+            'devel': {'feature': [],"vggface":[] , "egemaps": [], "bert":[], "timestamp":[], 'label': [], 'meta': []},
+            'test': {'feature': [],"vggface":[] , "egemaps": [],"bert":[], "timestamp":[], 'label': [], 'meta': []}}
     vid2partition, partition2vid = get_data_partition(paths['partition'])
-    feature_dims = [0] * len(feature_set)
-
-    feature_idx = 2  # first to columns are timestamp and segment_id, features start with the third column
 
     for partition, vids in partition2vid.items():
         for vid in vids:
             sample_data = []
-            segment_ids_per_step = []  # necessary for MuSe-Sent
-
-            # parse features
             for i, feature in enumerate(feature_set):
+                # parse feature
                 feature_file = os.path.join(feature_path, feature, vid + '.csv')
-                assert os.path.exists(
-                    feature_file), f'Error: no available "{feature}" feature file for video "{vid}": "{feature_file}".'
                 df = pd.read_csv(feature_file)
-                feature_dims[i] = df.shape[1] - feature_idx
                 if i == 0:
                     feature_data = df  # keep timestamp and segment id in 1st feature val
-                    segment_ids_per_step = df.iloc[:, 1]
-                else:
-                    feature_data = df.iloc[:, feature_idx:]
+                else: 
+                    feature_data= df.iloc[:, 2:]
                 sample_data.append(feature_data)
-            data[partition]['feature_dims'] = feature_dims
 
             # parse labels
             label_file = os.path.join(label_path, emo_dim, vid + '.csv')
-            assert os.path.exists(
-                label_file), f'Error: no available "{emo_dim}" label file for video "{vid}": "{label_file}".'
             df = pd.read_csv(label_file)
+            timestampt = df.iloc[:,0]
+            encoding_timestampt =timestampt/10e5
 
-            if task == 'sent':
-                label = df['class_id'].values
-                label_stretched = [label[s_id - 1] if not pd.isna(s_id) else pd.NA for s_id in segment_ids_per_step]
-                label_data = pd.DataFrame(data=label_stretched, columns=[emo_dim])
-            else:
-                label_data = pd.DataFrame(data=df['value'].values, columns=[emo_dim])
+            label_data = pd.DataFrame(data=df['value'].values, columns=[emo_dim])
+            if encoding_position:
+                sample_data.append(encoding_timestampt)
             sample_data.append(label_data)
 
+            # list with 3 Dataframe Item
             # concat
             sample_data = pd.concat(sample_data, axis=1)
+            # vgg_face = pd.read_csv("{}/{}/{}.csv".format(feature_path, 'vggface',vid))
+            # egemaps = pd.read_csv("{}/{}/{}.csv".format(feature_path, 'egemaps',vid))
+            # bert=  pd.read_csv("{}/{}/{}.csv".format(feature_path, 'bert-4',vid))
+            # if encoding_position:
+            #     vgg_face_features = pd.concat([vgg_face.iloc[:, 2:], encoding_timestampt], axis=1)
+            #     egemaps_features = pd.concat([egemaps.iloc[:, 2:], encoding_timestampt], axis=1)
+            #     bert = pd.concat([bert.iloc[:, 2:], encoding_timestampt], axis=1)
+            # else:
+            #     vgg_face_features = vgg_face.iloc[:, 2:]
+            #     egemaps_features = egemaps.iloc[:, 2:]
+            #     bert = egemaps.iloc[:, 2:]
+            # remove missing data
             if partition != 'test':
                 sample_data = sample_data.dropna()
 
             # segment
-            if apply_segmentation:
-                if task == 'sent':
-                    seg_type = 'by_segs_only' if partition != 'train' else 'by_segs'
-                    samples = segment_sample(sample_data, win_len, hop_len, seg_type)
-                elif task in ['wilder', 'physio', 'stress']:
-                    if partition == 'train':
-                        samples = segment_sample(sample_data, win_len, hop_len, 'normal')
-                    else:
-                        samples = [sample_data]
+            if apply_segmentation and partition == "train":
+                samples = segment_sample(sample_data, win_len, hop_len, 'normal')
+                # vgg_face_features = segment_sample(vgg_face_features, win_len, hop_len, 'normal')
+                # egemaps_features = segment_sample(egemaps_features, win_len, hop_len, 'normal')
+                # bert= segment_sample(bert, win_len, hop_len, 'normal')
             else:
-                if task == 'sent':
-                    samples = segment_sample(sample_data, win_len, hop_len, 'by_segs_only')
-                else:
-                    samples = [sample_data]
-
+                samples = [sample_data]
+                # vgg_face_features= [vgg_face_features]
+                # egemaps_features= [egemaps_features]
+                # bert= [bert]
             # store
             for i, segment in enumerate(samples):  # each segment has columns: timestamp, segment_id, features, labels
-                n_emo_dims = 1
-                if len(segment.iloc[:, feature_idx:-n_emo_dims].values) > 0:  # check if there are features
+                if len(segment.iloc[:, 2:-1].to_numpy()) > 0:  # check if there are features
                     meta = np.column_stack((np.array([int(vid)] * len(segment)),
-                                            segment.iloc[:, :feature_idx].values))  # video_id, timestamp, segment_id
+                                            segment.iloc[:, :2].to_numpy()))  # video_id, timestamp, segment_id
                     data[partition]['meta'].append(meta)
-                    data[partition]['label'].append(segment.iloc[:, -n_emo_dims:].values)
-                    data[partition]['feature'].append(segment.iloc[:, feature_idx:-n_emo_dims].values)
-
-    if normalize:
-        idx_list = []
-
-        assert norm_opts is not None and len(norm_opts) == len(feature_set)
-        norm_opts = [True if norm_opt == 'y' else False for norm_opt in norm_opts]
-
-        print(f'Feature dims: {feature_dims} ({feature_set})')
-        feature_dims = np.cumsum(feature_dims).tolist()
-        feature_dims = [0] + feature_dims
-
-        norm_feature_set = []  # normalize data per feature and only if norm_opts is True
-        for i, (s_idx, e_idx) in enumerate(zip(feature_dims[0:-1], feature_dims[1:])):
-            norm_opt, feature = norm_opts[i], feature_set[i]
-            if norm_opt:
-                norm_feature_set.append(feature)
-                idx_list.append([s_idx, e_idx])
-
-        print(f'Normalized features: {norm_feature_set}')
-        data = normalize_data(data, idx_list)
-
+                    data[partition]['label'].append(segment.iloc[:, -1:].to_numpy())
+                    data[partition]['feature'].append(segment.iloc[:, 2:-1].to_numpy())
+            # for i, segment in enumerate(vgg_face_features):
+            #     data[partition]['vggface'].append(segment.to_numpy())
+            # for i, segment in enumerate(egemaps_features):
+            #     data[partition]['egemaps'].append(segment.to_numpy())
+            # for i, segment in enumerate(bert):
+            #     data[partition]['bert'].append(segment.to_numpy())
+            
+    print("Normalize value: {}".format(str(normalize)))
+    # if normalize:
+    #     idx_list = []
+    #     assert norm_opts is not None and len(norm_opts) == len(feature_set)
+    #     norm_opts = [True if norm_opt == 'y' else False for norm_opt in norm_opts]
+    #     print(f'Feature dims: {feature_dims} ({feature_set})')
+    #     feature_dims = np.cumsum(feature_dims).t
+    #     feature_dims = [0] + feature_dims
+    #     print(feature_dims)
+    #     norm_feature_set = []  # normalize data per feature and only if norm_opts is True
+    #     for i, (s_idx, e_idx) in enumerate(zip(feature_dims[0:-1], feature_dims[1:])):
+    #         norm_opt, feature = norm_opts[i], feature_set[i]
+    #         if norm_opt:
+    #             norm_feature_set.append(feature)
+    #             idx_list.append([s_idx, e_idx])
+    #     print(f'Normalized features: {norm_feature_set}')
+    #     data = normalize_data(data, idx_list)
+        
+    print("Save preprocessed Data: {}".format(str(save)))
     if save:  # save loaded and preprocessed data
         print('Saving data...')
         pickle.dump(data, open(data_file, 'wb'))
-
+    
     return data
+
+if __name__ == '__main__':
+    load_data()

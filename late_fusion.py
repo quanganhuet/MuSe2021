@@ -15,7 +15,7 @@ from loss import CCCLoss
 from utils import Logger
 from train import train_model
 from eval import evaluate
-from model import Model
+from model import Model, MuseModel
 from dataset import MuSeDataset
 from data_parser import get_data_partition, segment_sample
 
@@ -69,18 +69,18 @@ def parse_args():
 def load_data(task, paths, emo_dim, win_len=200, hop_len=100, apply_segmentation=True):
     label_path = paths['labels']
     preds_paths = glob.glob(paths['preds'] + '/*/csv/')
-    print(preds_paths)
+    print(label_path)
 
     data = {'train': {'feature': [], 'label': [], 'meta': []},
             'devel': {'feature': [], 'label': [], 'meta': []},
             'test': {'feature': [], 'label': [], 'meta': []}}
+    print(paths['partition'])
     vid2partition, partition2vid = get_data_partition(paths['partition'])
     feature_dims = [1] * len(preds_paths)
     feature_idx = 2  # first to columns are timestamp and segment_id, features start with the third column
     for partition, vids in partition2vid.items():
         for vid in vids:
             sample_data = []
-            segment_ids_per_step = []  # necessary for MuSe-Sent
 
             # preds
             for i, path in enumerate(preds_paths):
@@ -98,16 +98,9 @@ def load_data(task, paths, emo_dim, win_len=200, hop_len=100, apply_segmentation
 
             # label
             label_file = os.path.join(label_path, emo_dim, vid + '.csv')
-            assert os.path.exists(
-                label_file), f'Error: no available "{emo_dim}" label file for video "{vid}": "{label_file}".'
             df = pd.read_csv(label_file)
 
-            if task == 'sent':
-                label = df['class_id'].values
-                label_stretched = [label[s_id - 1] if not pd.isna(s_id) else pd.NA for s_id in segment_ids_per_step]
-                label_data = pd.DataFrame(data=label_stretched, columns=[emo_dim])
-            else:  # task == 'wilder'
-                label_data = pd.DataFrame(data=df['value'].values, columns=[emo_dim])
+            label_data = pd.DataFrame(data=df['value'].values, columns=[emo_dim])
             sample_data.append(label_data)
 
             # concat
@@ -117,19 +110,13 @@ def load_data(task, paths, emo_dim, win_len=200, hop_len=100, apply_segmentation
 
             # segment
             if apply_segmentation:
-                if task == 'sent':
-                    seg_type = 'by_segs_only' if partition != 'train' else 'by_segs'
-                    samples = segment_sample(sample_data, win_len, hop_len, seg_type)
-                elif task in ['wilder', 'physio', 'stress']:
-                    if partition == 'train':
-                        samples = segment_sample(sample_data, win_len, hop_len, 'normal')
-                    else:
-                        samples = [sample_data]
-            else:
-                if task == 'sent':
-                    samples = segment_sample(sample_data, win_len, hop_len, 'by_segs_only')
+                if partition == 'train':
+                    print("1234")
+                    samples = segment_sample(sample_data, win_len, hop_len, 'normal')
                 else:
                     samples = [sample_data]
+            else:
+                samples = [sample_data]
 
             # store
             for i, segment in enumerate(samples):
@@ -153,20 +140,19 @@ def main(args):
     data_loader = {}
     for partition in data.keys():
         set = MuSeDataset(data, partition)
+        print(set.__len__())
         batch_size = args.batch_size if partition == 'train' else 1
         shuffle = True if partition == 'train' else False
         data_loader[partition] = torch.utils.data.DataLoader(set, batch_size=batch_size, shuffle=shuffle, num_workers=4)
 
     args.d_in = data_loader['train'].dataset.get_feature_dim()
 
-    if args.task == 'sent':
-        args.n_targets = max([x[0, 0] for x in data['train']['label']]) + 1  # number of classes
-        criterion = CrossEntropyLoss()
-        score_str = 'Macro-F1'
-    else:
-        args.n_targets = 1
-        criterion = CCCLoss()
-        score_str = 'CCC'
+    args.n_targets = 1
+    criterion = CCCLoss()
+    score_str = 'CCC'
+
+    tcn_ins = 3
+    tcn_channels = (32,)
 
     if args.eval_model is None:  # Train and validate for each seed
         seeds = range(args.seed, args.seed + args.n_seeds)
@@ -176,6 +162,9 @@ def main(args):
             torch.manual_seed(seed)
 
             model = Model(args)
+            # model= MuseModel(args, num_outputs=1, tcn_in= tcn_ins, tcn_channels= tcn_channels, num_dilations=8,
+            # dropout=0.2, use_norm=True)
+
 
             print('=' * 50)
             print('Training model... [seed {}]'.format(seed))
@@ -213,16 +202,13 @@ def main(args):
         evaluate(args.task, best_model, data_loader['test'], criterion, args.use_gpu, predict=True,
                  prediction_path=args.paths['predict'])
 
-    if not args.save and not args.eval_model:
-        if os.path.exists(model_file):
-            os.remove(model_file)
-
     print('Done.')
 
 
 if __name__ == '__main__':
+    
     args = parse_args()
-
+    args.pred_path= 'preds'
     args.log_file_name = 'FUSION_[{}]_[{}]_[{}_{}_{}]_[{}_{}]'.format(
         datetime.now(tz=tz.gettz()).strftime("%Y-%m-%d-%H-%M"), args.emo_dim,
         args.d_rnn, args.rnn_n_layers, args.rnn_bi, args.lr, args.batch_size)
@@ -230,7 +216,7 @@ if __name__ == '__main__':
     # adjust your paths in config.py
     args.paths = {'log': os.path.join(config.LOG_FOLDER, args.task),
                   'data': os.path.join(config.DATA_FOLDER, args.task),
-                  'model': os.path.join(config.MODEL_FOLDER, args.task, args.log_file_name)}
+                  'model': os.path.join(config.PREDICTION_FOLDER, args.task, args.log_file_name)}
     if args.predict:
         args.paths['predict'] = os.path.join(config.PREDICTION_FOLDER, args.task, args.log_file_name)
     for folder in args.paths.values():

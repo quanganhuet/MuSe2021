@@ -34,7 +34,7 @@ python main.py --task sent --emo_dim arousal --feature_set bert --d_rnn 64 --rnn
 ### MuSe-Stress: 
 
 ```
-python main.py --task stress --emo_dim arousal --feature_set vggface --d_rnn 64 --rnn_n_layers 4 --rnn_bi --lr 0.002 --epochs 100 --batch_size 1024 --n_seeds 10 --win_len 300 --hop_len 50 --use_gpu --cache --save --save_path preds
+python main.py --task stress --emo_dim arousal --feature_set vggface --d_rnn 64 --rnn_n_layers 4 --lr 0.0002 --epochs 100 --batch_size 64 --n_seeds 10 --win_len 300 --hop_len 50 --use_gpu --cache --save --save_path preds
 ```
 
 ### MuSe-Physio: 
@@ -48,6 +48,8 @@ Set `--save` in the above calls to save predictions for data samples of all part
 
 ```
 python late_fusion.py --task wilder --emo_dim valence --preds_path preds --d_rnn 32 --rnn_n_layers 2 --epochs 20 --batch_size 64 --lr 0.001 --n_seeds 5 --win_len 200 --hop_len 100 --use_gpu --predict
+
+python late_fusion.py --task stress --emo_dim valence --preds_path preds --d_rnn 32 --rnn_n_layers 2 --epochs 20 --batch_size 32 --lr 0.001 --n_seeds 5 --win_len 300 --hop_len 50 --use_gpu --predict
 ```
 
 ## Settings

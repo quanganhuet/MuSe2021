@@ -1,8 +1,8 @@
 # MuSe2021 || <a href="https://www.muse-challenge.org/">HOMEPAGE</a>
 
-## Baseline model: LSTM Regressor / Classifier 
+Code for the Paper
 ## Multi-modal Stress Recognition Using Temporal Convolution and Recurrent Network with Positional Embedding
-## Rank:3
+## Rank:3 in MuSe-Stress 
 
 Sub-challenges: **MuSe-Wilder** and **MuSe-Stress** which focus on continuous emotion (valence and arousal) prediction; **MuSe-Sent**, in which participants recognise five classes each for valence and arousal; and **MuSe-Physio**, in which the novel aspect of physiological-emotion is to be predicted. 
 
@@ -21,16 +21,6 @@ Create a virtenv; check and install packages in requirements.txt; download the d
 
 ## Run: Sample calls for each sub-challenges 
 
-### MuSe-Wilder:
-
-```
-python main.py --task wilder --emo_dim arousal --feature_set egemaps --normalize --norm_opts y --d_rnn 128 --rnn_n_layers 4 --epochs 100 --batch_size 1024 --n_seeds 10 --win_len 200 --hop_len 100 --use_gpu --cache --save --save_path preds
-```
-
-### MuSe-Sent:
-
-```
-python main.py --task sent --emo_dim arousal --feature_set bert --d_rnn 64 --rnn_n_layers 4  --lr 0.0001 --epochs 100 --batch_size 1024 --n_seeds 10 --win_len 200 --hop_len 100 --use_gpu --cache --save --save_path preds
 ```
 
 ### MuSe-Stress: 
@@ -39,10 +29,6 @@ python main.py --task sent --emo_dim arousal --feature_set bert --d_rnn 64 --rnn
 python main.py --task stress --emo_dim arousal --feature_set vggface --d_rnn 64 --rnn_n_layers 4 --lr 0.0002 --epochs 100 --batch_size 64 --n_seeds 10 --win_len 300 --hop_len 50 --use_gpu --cache --save --save_path preds
 ```
 
-### MuSe-Physio: 
-
-```
-python main.py --task physio --emo_dim anno12_EDA --feature_set vggish --d_rnn 32 --rnn_n_layers 2 --rnn_bi --lr 0.005 --epochs 100 --batch_size 1024 --n_seeds 10 --win_len 300 --hop_len 50 --use_gpu --cache --save --save_path preds
 ```
 
 ### Late Fusion:
